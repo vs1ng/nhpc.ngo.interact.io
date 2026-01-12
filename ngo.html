@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NGO Dashboard (Functional)</title>
+  <style>
+    /* ... (Your original CSS remains exactly the same, abbreviated here for space) ... */
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+    body { background: #f5f5f5; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header { background: #2c3e50; color: white; padding: 15px; text-align: center; }
+    .nav { display: flex; gap: 10px; margin: 15px 0; background: #ecf0f1; padding: 10px; border-radius: 5px; }
+    .nav button { padding: 8px 15px; border: none; cursor: pointer; background: #3498db; color: white; border-radius: 4px; }
+    .nav button:hover { background: #2980b9; }
+    .nav button.active { background: #e74c3c; }
+    .page { display: none; background: white; padding: 20px; border-radius: 8px; margin-top: 15px; }
+    .page.active { display: block; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; border: 2px solid #34495e; }
+    th, td { border: 1px solid #bdc3c7; padding: 8px; text-align: left; }
+    th { background: #3498db; color: white; font-weight: bold; }
+    .btn-create { background: #27ae60; color: white; padding: 10px 20px; border: none; cursor: pointer; }
+    .btn-count { background: #95a5a6; color: white; padding: 4px 8px; border: none; cursor: pointer; }
+    .form-container { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border: 2px solid #34495e; z-index: 1000; width: 90%; max-width: 800px; }
+    .form-row { display: flex; gap: 15px; margin-bottom: 15px; }
+    .form-group { flex: 1; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; }
+    input, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; }
+    .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; }
+    .btn-cancel { background: #e74c3c; color: white; padding: 8px; border: none; cursor: pointer; }
+    
+    /* MODAL CSS FOR DETAILS */
+    #details-modal .modal-content { display: flex; flex-direction: column; gap: 15px; }
+    #close-details { background: #e74c3c; color: white; border: none; padding: 10px; cursor: pointer; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">NGO DASHBOARD (Functional)</div>
+    <div style="text-align:center; padding:5px; font-size:12px; color:#777;">System resets: <button onclick="localStorage.clear(); location.reload()">Clear All Data</button></div>
+
+    <div class="nav">
+      <button id="btn-active" class="active">ACTIVE TASKS</button>
+      <button id="btn-new">NEW TASK</button>
+    </div>
+
+    <div id="active-tasks" class="page active">
+      <h3>YOUR TASKS</h3>
+      <table id="active-tasks-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>TASK NAME</th>
+            <th>STATUS</th>
+            <th>NEEDED</th>
+            <th>APPLIED (Click to view)</th>
+            <th>START DATE</th>
+          </tr>
+        </thead>
+        <tbody>
+          </tbody>
+      </table>
+    </div>
+
+    <div id="new-task" class="page">
+      <h3>CREATE NEW TASK</h3>
+      <div class="form-row"><div class="form-group"><label>TASK NAME</label><input type="text" id="new-task-name"></div></div>
+      <div class="form-row">
+          <div class="form-group"><label>NEEDED</label><input type="number" id="volunteers-needed"></div>
+          <div class="form-group"><label>DEPT</label><input type="text" id="task-dept"></div>
+          <div class="form-group"><label>CATEGORY</label><input type="text" id="task-category"></div>
+      </div>
+      <div class="form-row">
+          <div class="form-group"><label>START</label><input type="date" id="start-date"></div>
+          <div class="form-group"><label>END</label><input type="date" id="end-date"></div>
+      </div>
+      <div class="form-group"><label>CRIT ATTRIBUTES (Know, Skill, Attitude)</label><input type="text" id="crit-attr" placeholder="e.g. Cooking, Patience, Teamwork"></div>
+      
+      <button class="btn-create" id="confirm-create">CREATE TASK</button>
+    </div>
+
+    <div class="overlay" id="overlay-details"></div>
+    <div class="form-container" id="details-modal">
+      <div class="form-title">APPLICANT DETAILS</div>
+      <div id="modal-list-content"></div>
+      <button id="close-details">CLOSE</button>
+    </div>
+
+  </div>
+
+  <script>
+    // --- SHARED DATA MANAGER ---
+    const DB = {
+      getTasks: () => JSON.parse(localStorage.getItem('NGO_TASKS')) || [],
+      saveTasks: (tasks) => localStorage.setItem('NGO_TASKS', JSON.stringify(tasks)),
+      getApps: () => JSON.parse(localStorage.getItem('NGO_APPS')) || [],
+      saveApps: (apps) => localStorage.setItem('NGO_APPS', JSON.stringify(apps))
+    };
+
+    // DOM Elements
+    const tableBody = document.querySelector('#active-tasks-table tbody');
+    const overlay = document.getElementById('overlay-details');
+    const modal = document.getElementById('details-modal');
+
+    // 1. RENDER TASKS
+    function renderTasks() {
+      const tasks = DB.getTasks();
+      const apps = DB.getApps();
+      tableBody.innerHTML = '';
+
+      tasks.forEach(task => {
+        // Count applications for this task
+        const appCount = apps.filter(a => a.taskId == task.id).length;
+        
+        let statusColor = 'orange';
+        if(task.status === 'approved_open') statusColor = 'green';
+        if(task.status === 'pending_csr') statusColor = 'red';
+
+        const row = `
+          <tr>
+            <td>${task.id}</td>
+            <td>${task.name}</td>
+            <td style="color:${statusColor}; font-weight:bold">${task.status.toUpperCase()}</td>
+            <td>${task.needed}</td>
+            <td><button class="btn-count" onclick="viewApplicants(${task.id})">${appCount}</button></td>
+            <td>${task.start}</td>
+          </tr>
+        `;
+        tableBody.insertAdjacentHTML('beforeend', row);
+      });
+    }
+
+    // 2. CREATE TASK
+    document.getElementById('confirm-create').addEventListener('click', () => {
+        const tasks = DB.getTasks();
+        const newTask = {
+            id: Date.now(), // Simple unique ID
+            name: document.getElementById('new-task-name').value,
+            needed: document.getElementById('volunteers-needed').value,
+            dept: document.getElementById('task-dept').value,
+            category: document.getElementById('task-category').value,
+            start: document.getElementById('start-date').value,
+            end: document.getElementById('end-date').value,
+            critAttr: document.getElementById('crit-attr').value,
+            ngoName: "MUSKAAN", // Hardcoded for demo
+            status: "pending_csr" // Default status
+        };
+
+        if(!newTask.name) return alert("Enter task name");
+
+        tasks.push(newTask);
+        DB.saveTasks(tasks);
+        alert("Task Created! Sent to CSR for approval.");
+        
+        // Reset and Switch View
+        document.getElementById('new-task-name').value = '';
+        showPage('active-tasks');
+        renderTasks();
+    });
+
+    // 3. VIEW APPLICANTS
+    window.viewApplicants = function(taskId) {
+        const apps = DB.getApps().filter(a => a.taskId == taskId);
+        const container = document.getElementById('modal-list-content');
+        
+        if(apps.length === 0) {
+            container.innerHTML = "<p>No applicants yet.</p>";
+        } else {
+            let html = '<table style="width:100%"><tr><th>Name</th><th>Status</th><th>Interm</th></tr>';
+            apps.forEach(a => {
+                html += `<tr><td>${a.fname} ${a.lname}</td><td>${a.status}</td><td>${a.intermName || 'None'}</td></tr>`;
+            });
+            html += '</table>';
+            container.innerHTML = html;
+        }
+        overlay.style.display = 'block';
+        modal.style.display = 'block';
+    }
+
+    // Navigation Logic
+    document.getElementById('btn-active').onclick = () => showPage('active-tasks');
+    document.getElementById('btn-new').onclick = () => showPage('new-task');
+    document.getElementById('close-details').onclick = () => { overlay.style.display='none'; modal.style.display='none'; };
+
+    function showPage(id) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        if(id === 'active-tasks') renderTasks();
+    }
+
+    // Init
+    renderTasks();
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CSR System (Functional)</title>
+  <style>
+    /* ... (Original CSS abbreviated) ... */
+    * { box-sizing: border-box; font-family: Arial, sans-serif; }
+    body { background: #f5f5f5; padding: 20px; }
+    .split-view { display: flex; gap: 20px; }
+    .left-panel, .right-panel { background: white; padding: 15px; border: 1px solid #ccc; flex: 1; }
+    .action-btn { background: #007bff; color: white; padding: 5px; cursor: pointer; border: none; }
+    .btn-green { background: green; color: white; padding: 10px; border: none; cursor: pointer; width: 100%; margin-top:10px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #ccc; padding: 5px; }
+  </style>
+</head>
+<body>
+
+  <h2>CSR DASHBOARD</h2>
+  <p>Tasks waiting for approval:</p>
+  
+  <div class="split-view">
+    <div class="left-panel">
+      <h3>INCOMING (Pending)</h3>
+      <table id="incomingTable">
+        <thead><tr><th>NGO</th><th>TASK</th><th>ACTION</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="right-panel">
+      <h3>Task Details</h3>
+      <div id="taskDetails">Select a task to view details</div>
+    </div>
+  </div>
+
+  <script>
+    const DB = {
+      getTasks: () => JSON.parse(localStorage.getItem('NGO_TASKS')) || [],
+      saveTasks: (tasks) => localStorage.setItem('NGO_TASKS', JSON.stringify(tasks))
+    };
+
+    let selectedTaskIndex = null;
+    let currentTasks = [];
+
+    function loadIncoming() {
+        const allTasks = DB.getTasks();
+        // Filter for pending tasks
+        currentTasks = allTasks.filter(t => t.status === 'pending_csr');
+        
+        const tbody = document.querySelector('#incomingTable tbody');
+        tbody.innerHTML = '';
+
+        if(currentTasks.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3">No incoming tasks.</td></tr>';
+            return;
+        }
+
+        currentTasks.forEach((t, index) => {
+            const row = `<tr>
+                <td>${t.ngoName}</td>
+                <td>${t.name}</td>
+                <td><button class="action-btn" onclick="inspect(${index})">INSPECT</button></td>
+            </tr>`;
+            tbody.insertAdjacentHTML('beforeend', row);
+        });
+    }
+
+    window.inspect = function(index) {
+        selectedTaskIndex = index;
+        const task = currentTasks[index];
+        const html = `
+            <p><strong>Name:</strong> ${task.name}</p>
+            <p><strong>Dept:</strong> ${task.dept}</p>
+            <p><strong>Needed:</strong> ${task.needed}</p>
+            <p><strong>Attributes:</strong> ${task.critAttr}</p>
+            <button class="btn-green" onclick="approveCurrent()">APPROVE TASK</button>
+        `;
+        document.getElementById('taskDetails').innerHTML = html;
+    }
+
+    window.approveCurrent = function() {
+        if (selectedTaskIndex === null) return;
+        
+        const taskToApprove = currentTasks[selectedTaskIndex];
+        const allTasks = DB.getTasks();
+        
+        // Find and update in main DB
+        const dbTask = allTasks.find(t => t.id === taskToApprove.id);
+        if(dbTask) {
+            dbTask.status = 'approved_open'; // THIS MAKES IT VISIBLE TO EMPLOYEES
+            DB.saveTasks(allTasks);
+            alert("Task Approved! Now visible to Employees.");
+            document.getElementById('taskDetails').innerHTML = "Select a task...";
+            loadIncoming();
+        }
+    }
+
+    loadIncoming();
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>HOD Dashboard (Functional)</title>
+  <style>
+    /* ... (Original CSS) ... */
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+    body { background: #f5f5f5; padding: 20px; }
+    table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #333; }
+    th, td { border: 1px solid #ccc; padding: 10px; }
+    th { background: #3498db; color: white; }
+    .btn-affirm { background: #2ecc71; color: white; padding: 5px 10px; border:none; cursor:pointer; }
+    .btn-deny { background: #e74c3c; color: white; padding: 5px 10px; border:none; cursor:pointer; }
+  </style>
+</head>
+<body>
+    <h2>HOD DASHBOARD</h2>
+    <h3>ACTIVITY (Pending Approval)</h3>
+    <table id="activity-table">
+        <thead><tr><th>Employee</th><th>Task</th><th>Interm Remarks</th><th>Action</th></tr></thead>
+        <tbody></tbody>
+    </table>
+
+    <h3>ACTIVE TASKS (Affirmed)</h3>
+    <table id="active-tasks">
+        <thead><tr><th>Employee</th><th>Task</th><th>Status</th></tr></thead>
+        <tbody></tbody>
+    </table>
+
+  <script>
+    const DB = {
+      getApps: () => JSON.parse(localStorage.getItem('NGO_APPS')) || [],
+      saveApps: (apps) => localStorage.setItem('NGO_APPS', JSON.stringify(apps))
+    };
+
+    function loadHOD() {
+        const apps = DB.getApps();
+        
+        // 1. Pending List
+        const pending = apps.filter(a => a.status === 'pending_hod');
+        const pendingBody = document.querySelector('#activity-table tbody');
+        pendingBody.innerHTML = '';
+        
+        pending.forEach(a => {
+            const remarks = a.remarks ? a.remarks : 'Direct Application (No Interm)';
+            const row = `<tr>
+                <td>${a.fname} ${a.lname}</td>
+                <td>${a.taskName}</td>
+                <td>${remarks}</td>
+                <td>
+                    <button class="btn-affirm" onclick="decide(${a.appId}, 'accepted')">AFFIRM</button>
+                    <button class="btn-deny" onclick="decide(${a.appId}, 'rejected')">DENY</button>
+                </td>
+            </tr>`;
+            pendingBody.insertAdjacentHTML('beforeend', row);
+        });
+
+        // 2. Active List (Already Accepted)
+        const active = apps.filter(a => a.status === 'accepted');
+        const activeBody = document.querySelector('#active-tasks tbody');
+        activeBody.innerHTML = '';
+        
+        active.forEach(a => {
+            const row = `<tr><td>${a.fname}</td><td>${a.taskName}</td><td style="color:green">ACTIVE</td></tr>`;
+            activeBody.insertAdjacentHTML('beforeend', row);
+        });
+    }
+
+    window.decide = (appId, newStatus) => {
+        const apps = DB.getApps();
+        const app = apps.find(a => a.appId === appId);
+        if(app) {
+            app.status = newStatus;
+            DB.saveApps(apps);
+            alert(`Application ${newStatus.toUpperCase()}`);
+            loadHOD();
+        }
+    }
+
+    loadHOD();
+  </script>
+</body>
+</html>
+

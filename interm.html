@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Interm Officer (Functional)</title>
+  <style>
+    /* ... (Original CSS) ... */
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+    body { background: #f5f5f5; padding: 20px; }
+    table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #333; }
+    th, td { border: 1px solid #ccc; padding: 10px; }
+    th { background: #3498db; color: white; }
+    .btn-view { background: #e67e22; color: white; border:none; padding:5px; cursor:pointer;}
+    
+    /* Modal */
+    .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+    .form-container { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; width: 400px; border: 2px solid #333; z-index: 1000; }
+    textarea { width: 100%; height: 80px; margin-top: 10px; }
+    .btn-save { background: green; color: white; padding: 10px; border: none; cursor: pointer; float: right; margin-top:10px; }
+  </style>
+</head>
+<body>
+    <h2>INTERM OFFICER DASHBOARD</h2>
+    <p>Logged in as: <strong>int</strong></p>
+    
+    <h3>PENDING REVIEW</h3>
+    <table id="pending-applications">
+      <thead><tr><th>Employee</th><th>Task</th><th>Employee Skill Claim</th><th>Action</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="overlay" id="overlay"></div>
+    <div class="form-container" id="review-form">
+        <h3>Add Remarks</h3>
+        <p id="emp-details"></p>
+        <textarea id="remarks" placeholder="Enter remarks..."></textarea>
+        <button class="btn-save" id="save-review">APPROVE & SEND TO HOD</button>
+        <button onclick="closeModal()" style="margin-top:10px;">Cancel</button>
+    </div>
+
+  <script>
+    const DB = {
+      getApps: () => JSON.parse(localStorage.getItem('NGO_APPS')) || [],
+      saveApps: (apps) => localStorage.setItem('NGO_APPS', JSON.stringify(apps))
+    };
+
+    let currentAppId = null;
+
+    function loadPending() {
+        const apps = DB.getApps();
+        // FILTER: Status is pending_interm AND assigned to 'int'
+        const myTasks = apps.filter(a => a.status === 'pending_interm' && a.intermName === 'int');
+
+        const tbody = document.querySelector('#pending-applications tbody');
+        tbody.innerHTML = '';
+
+        if(myTasks.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4">No pending applications.</td></tr>';
+            return;
+        }
+
+        myTasks.forEach(a => {
+            const row = `<tr>
+                <td>${a.fname} ${a.lname}</td>
+                <td>${a.taskName}</td>
+                <td>${a.skills}</td>
+                <td><button class="btn-view" onclick="openReview(${a.appId})">REVIEW</button></td>
+            </tr>`;
+            tbody.insertAdjacentHTML('beforeend', row);
+        });
+    }
+
+    window.openReview = (appId) => {
+        currentAppId = appId;
+        const app = DB.getApps().find(a => a.appId === appId);
+        document.getElementById('emp-details').innerText = `Reviewing: ${app.fname} for ${app.taskName}`;
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('review-form').style.display = 'block';
+    }
+
+    window.closeModal = () => {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('review-form').style.display = 'none';
+    }
+
+    document.getElementById('save-review').addEventListener('click', () => {
+        const remarks = document.getElementById('remarks').value;
+        const apps = DB.getApps();
+        const app = apps.find(a => a.appId === currentAppId);
+        
+        if(app) {
+            app.remarks = remarks;
+            app.status = 'pending_hod'; // MOVE TO HOD
+            DB.saveApps(apps);
+            alert("Review Saved. Forwarded to HOD.");
+            closeModal();
+            loadPending();
+        }
+    });
+
+    loadPending();
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Employee Dashboard (Functional)</title>
+  <style>
+    /* ... (Keep your original CSS) ... */
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+    body { background: #f5f5f5; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .nav { display: flex; gap: 10px; margin: 15px 0; background: #ecf0f1; padding: 10px; }
+    .nav button { padding: 8px 15px; cursor: pointer; background: #3498db; color: white; border:none; }
+    .page { display: none; background: white; padding: 20px; }
+    .page.active { display: block; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; border: 1px solid #333; }
+    th, td { border: 1px solid #ccc; padding: 8px; }
+    th { background: #3498db; color: white; }
+    .btn-apply { background: #2ecc71; color: white; padding: 5px 10px; border: none; cursor: pointer; }
+    
+    /* Form Overlay */
+    .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+    .form-container { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; z-index: 1000; border: 2px solid #333; }
+    input { display:block; margin: 5px 0 15px 0; width: 100%; padding: 5px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>EMPLOYEE DASHBOARD (Functional)</h2>
+    <div class="nav">
+      <button onclick="showPage('main-page')">AVAILABLE TASKS</button>
+      <button onclick="showPage('status-page')">MY STATUS</button>
+    </div>
+
+    <div id="main-page" class="page active">
+      <h3>TASKS AVAILABLE FOR APPLICATION</h3>
+      <table id="available-tasks">
+        <thead><tr><th>Task Name</th><th>NGO</th><th>Dept</th><th>Action</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="status-page" class="page">
+      <h3>MY APPLICATIONS</h3>
+      <table id="status-tasks">
+        <thead><tr><th>Task</th><th>Status</th><th>Interm Officer</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    <div class="form-container" id="application-form">
+      <h3>Apply for Task</h3>
+      <label>My Name (First Last)</label>
+      <input type="text" id="fname" value="Harish Singla"> <label>Interm Officer Name (Type "int" to trigger Interm flow, or "NA")</label>
+      <input type="text" id="interm-name" placeholder="Type 'int' or 'NA'">
+      
+      <label>HOD Name</label>
+      <input type="text" id="hod-name" value="Mr. Boss">
+
+      <label>Why are you fit for this? (Knowledge/Skills)</label>
+      <input type="text" id="skills" placeholder="I am good at...">
+
+      <button class="btn-apply" id="submit-form">SUBMIT APPLICATION</button>
+      <button onclick="closeForm()">CLOSE</button>
+    </div>
+  </div>
+
+  <script>
+    const DB = {
+      getTasks: () => JSON.parse(localStorage.getItem('NGO_TASKS')) || [],
+      getApps: () => JSON.parse(localStorage.getItem('NGO_APPS')) || [],
+      saveApps: (apps) => localStorage.setItem('NGO_APPS', JSON.stringify(apps))
+    };
+
+    let currentTaskId = null;
+
+    // 1. LOAD AVAILABLE TASKS
+    function loadTasks() {
+      const tasks = DB.getTasks().filter(t => t.status === 'approved_open'); // Only approved tasks
+      const tbody = document.querySelector('#available-tasks tbody');
+      tbody.innerHTML = '';
+      
+      tasks.forEach(t => {
+        const row = `<tr>
+          <td>${t.name}</td>
+          <td>${t.ngoName}</td>
+          <td>${t.dept}</td>
+          <td><button class="btn-apply" onclick="openForm(${t.id})">APPLY</button></td>
+        </tr>`;
+        tbody.insertAdjacentHTML('beforeend', row);
+      });
+    }
+
+    // 2. LOAD STATUS
+    function loadStatus() {
+      const myApps = DB.getApps().filter(a => a.fname === 'Harish'); // Mock logged in user
+      const tbody = document.querySelector('#status-tasks tbody');
+      tbody.innerHTML = '';
+
+      myApps.forEach(a => {
+        let color = 'orange';
+        if(a.status === 'accepted') color = 'green';
+        if(a.status === 'rejected') color = 'red';
+
+        const row = `<tr>
+          <td>${a.taskName}</td>
+          <td style="color:${color}; font-weight:bold">${a.status.toUpperCase()}</td>
+          <td>${a.intermName}</td>
+        </tr>`;
+        tbody.insertAdjacentHTML('beforeend', row);
+      });
+    }
+
+    // 3. APPLY LOGIC
+    window.openForm = (taskId) => {
+      currentTaskId = taskId;
+      document.getElementById('overlay').style.display = 'block';
+      document.getElementById('application-form').style.display = 'block';
+    };
+
+    window.closeForm = () => {
+      document.getElementById('overlay').style.display = 'none';
+      document.getElementById('application-form').style.display = 'none';
+    };
+
+    document.getElementById('submit-form').addEventListener('click', () => {
+      const intermVal = document.getElementById('interm-name').value.trim();
+      const allTasks = DB.getTasks();
+      const task = allTasks.find(t => t.id === currentTaskId);
+
+      // LOGIC BRANCH: Check Interm
+      let initialStatus = 'pending_hod'; // Default skip to HOD
+      if(intermVal === 'int') {
+        initialStatus = 'pending_interm'; // Stop at Interm
+      }
+
+      const newApp = {
+        appId: Date.now(),
+        taskId: currentTaskId,
+        taskName: task.name,
+        fname: document.getElementById('fname').value, // 'Harish'
+        lname: 'Singla',
+        intermName: intermVal,
+        hodName: document.getElementById('hod-name').value,
+        skills: document.getElementById('skills').value,
+        status: initialStatus
+      };
+
+      const apps = DB.getApps();
+      apps.push(newApp);
+      DB.saveApps(apps);
+
+      alert(`Application Submitted! Status: ${initialStatus.toUpperCase()}`);
+      closeForm();
+      loadStatus();
+    });
+
+    function showPage(id) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      if(id === 'main-page') loadTasks();
+      if(id === 'status-page') loadStatus();
+    }
+
+    loadTasks();
+  </script>
+</body>
+</html>
+
